@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <stdlib.h>
 
 int test() {
     printf("Wow\n");
@@ -10,11 +9,9 @@ int main(int argc, const char **argv) {
     int num;
     scanf("%i", &num);
 
-    if (num) {
-        printf("TRUE\n");
-        exit(1);
-    } else {
+    while (num) {
         test();
+        scanf("%i", &num);
     }
 
     printf("number = %i\n", num);

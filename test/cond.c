@@ -14,7 +14,8 @@ int main(int argc, const char **argv) {
         printf("TRUE\n");
         exit(1);
     } else {
-        test();
+        int x = rand();
+        printf("num + random: %i\n", num + x);
     }
 
     printf("number = %i\n", num);
