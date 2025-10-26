@@ -5,7 +5,7 @@ set -e
 
 # --- Configuration ---
 # Path to your compiled pass plugin
-PASS_PLUGIN="./build/pass/Dummy.so"
+PASS_PLUGIN="./build/pass/Cfg.so"
 # ---------------------
 
 # 1. Check if an argument was provided
@@ -31,10 +31,6 @@ if [ ! -f "$PASS_PLUGIN" ]; then
     exit 1
 fi
 
-# 5. Create the output file name
-# This takes the input (e.g., "test/example.c")
-# and removes the ".c" part: "test/example"
-# then adds ".out": "test/example.out"
 OUTPUT_FILE="${SOURCE_FILE%.c}.out"
 
 # 6. Run the compile command with the variables
