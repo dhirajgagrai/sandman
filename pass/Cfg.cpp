@@ -58,33 +58,43 @@ struct CfgPass : public PassInfoMixin<CfgPass> {
                 for (Function::iterator BI = F.begin(), BE = F.end(); BI != BE; ++BI) {
                     BasicBlock *B = dyn_cast<BasicBlock>(&*BI);
                     string bbName = FI->getName().str() + "-" + B->getName().str();
-                    string prev = bbName;
 
                     int itrmCount = 0;
+                    string uBbName = "";
+                    string prev = bbName;
                     for (Instruction &I : *B) {
                         if (isa<CallInst>(I)) {
                             string funcName = cast<CallInst>(I).getCalledFunction()->getName().str();
                             if (isLibFn(funcName)) {
                                 itrmCount++;
 
-                                nfa[prev][bbName + "_i" + to_string(itrmCount)] = funcName;
-                                prev = bbName + "_i" + to_string(itrmCount);
+                                uBbName = bbName + "_i" + to_string(itrmCount);
+                                nfa[prev][uBbName] = funcName;
+                                prev = uBbName;
                             }
                         }
                     }
 
                     if (successors(B).empty()) {
-                        if (itrmCount) {
-                            nfa[bbName + "_i" + to_string(itrmCount)][FI->getName().str() + "-" + EXIT] = EP;
+                        string uExit = FI->getName().str() + "-" + EXIT;
+                        if (itrmCount == 0) {
+                            // epsilon transition to exit state from a block
+                            nfa[bbName][uExit] = EP;
                         } else {
-                            nfa[B->getName().str()][FI->getName().str() + "-" + EXIT] = EP;
+                            // epsilon transition to exit state after intermediate lib call in a block
+                            // uBbName -> last intermediate lib call
+                            nfa[uBbName][uExit] = EP;
                         }
                     } else {
                         for (BasicBlock *Succ : successors(B)) {
+                            string uSuccName = FI->getName().str() + "-" + Succ->getName().str();
                             if (itrmCount == 0) {
-                                nfa[bbName][FI->getName().str() + "-" + Succ->getName().str()] = EP;
+                                // epsilon transition to successor blocks from a block
+                                nfa[bbName][uSuccName] = EP;
                             } else {
-                                nfa[bbName + "_i" + to_string(itrmCount)][FI->getName().str() + "-" + Succ->getName().str()] = EP;
+                                // epsilon transition to successor blocks after intermediate lib call in a block
+                                // uBbName -> last intermediate lib call
+                                nfa[uBbName][uSuccName] = EP;
                             }
                         }
                     }
