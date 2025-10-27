@@ -35,7 +35,8 @@ unordered_set<string> loadFunctionList() {
 }
 
 struct CfgPass : public PassInfoMixin<CfgPass> {
-    const string EP = "epsilon";
+    const string EP = "EP";
+    const string ENTRY = "entry";
     const string EXIT = "exit";
 
     unordered_set<string> fnsList;
@@ -50,90 +51,97 @@ struct CfgPass : public PassInfoMixin<CfgPass> {
     PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM) {
         LibFunc LF;
 
-        // 1. Start the graph
         llvm::outs() << "digraph NFA {\n";
         llvm::outs() << "  node [shape=doublebox];\n\n";
 
-        // 2. Define special nodes (accepting states)
-        const std::set<std::string> &specialStates = {"main-entry", "test-entry", "main-exit", "test-exit"};
+        const std::set<std::string> &specialStates = {"main-" + ENTRY, "main-" + EXIT};
         for (const std::string &state : specialStates) {
             llvm::outs() << "  \"" << state << "\" [shape=circle,width=1,fixedsize=true];\n";
         }
         llvm::outs() << "\n";
 
+        map<string, map<string, string>> nfa;
+
         for (Module::iterator FI = M.begin(), FE = M.end(); FI != FE; ++FI) {
-            map<string, map<string, string>> nfa;
             if (!isLibFn(FI->getName().str())) {
                 Function &F = *FI;
+                BasicBlock &EntryBlock = F.getEntryBlock();
 
                 for (Function::iterator BI = F.begin(), BE = F.end(); BI != BE; ++BI) {
                     BasicBlock *B = dyn_cast<BasicBlock>(&*BI);
                     string bbName = FI->getName().str() + "-" + B->getName().str();
 
-                    int itrmCount = 0;
+                    if (B->getName().str() == EntryBlock.getName().str()) {
+                        bbName = FI->getName().str() + "-" + ENTRY;
+                    }
+
+                    bool isItrmInserted = false;
+                    int itrmCount = 1;
                     string uBbName = "";
-                    string prev = bbName;
+                    string prevBb = bbName;
+
                     for (Instruction &I : *B) {
                         if (isa<CallInst>(I)) {
                             string funcName = cast<CallInst>(I).getCalledFunction()->getName().str();
                             if (isLibFn(funcName)) {
-                                itrmCount++;
-
                                 uBbName = bbName + "_i" + to_string(itrmCount);
-                                nfa[prev][uBbName] = funcName;
-                                prev = uBbName;
+                                nfa[prevBb][uBbName] = funcName + "()";
+
+                                itrmCount++;
+                            } else {
+                                uBbName = funcName + "-" + ENTRY;
+                                nfa[prevBb][uBbName] = EP;
+                                uBbName = funcName + "-" + EXIT;
                             }
+
+                            prevBb = uBbName;
+                            isItrmInserted = true;
                         }
                     }
 
                     if (successors(B).empty()) {
                         string uExit = FI->getName().str() + "-" + EXIT;
-                        if (itrmCount == 0) {
-                            // epsilon transition to exit state from a block
-                            nfa[bbName][uExit] = EP;
-                        } else {
+                        if (isItrmInserted) {
                             // epsilon transition to exit state after intermediate lib call in a block
                             // uBbName -> last intermediate lib call
                             nfa[uBbName][uExit] = EP;
+                        } else {
+                            // epsilon transition to exit state from a block
+                            nfa[bbName][uExit] = EP;
                         }
                     } else {
                         for (BasicBlock *Succ : successors(B)) {
                             string uSuccName = FI->getName().str() + "-" + Succ->getName().str();
-                            if (itrmCount == 0) {
-                                // epsilon transition to successor blocks from a block
-                                nfa[bbName][uSuccName] = EP;
-                            } else {
+                            if (isItrmInserted) {
                                 // epsilon transition to successor blocks after intermediate lib call in a block
                                 // uBbName -> last intermediate lib call
                                 nfa[uBbName][uSuccName] = EP;
+                            } else {
+                                // epsilon transition to successor blocks from a block
+                                nfa[bbName][uSuccName] = EP;
                             }
                         }
                     }
 
                 } // end Function:iterator loop
             }
+        } // end Module:iterator loop
 
-            // Loop through the OUTER map (Key = currentState)
-            for (const auto &outerPair : nfa) {
-                std::string currentState = outerPair.first;
-                const auto &transitions = outerPair.second;
+        for (const auto &outerPair : nfa) {
+            std::string currentState = outerPair.first;
+            const auto &transitions = outerPair.second;
 
-                // Loop through the INNER map
-                for (const auto &innerPair : transitions) {
-                    // Your logic:
-                    std::string nextState = innerPair.first; // Key = Next State
-                    std::string input = innerPair.second;    // Value = Input
+            for (const auto &innerPair : transitions) {
+                std::string nextState = innerPair.first;
+                std::string input = innerPair.second;
 
-                    // Create the DOT edge from this logic
-                    llvm::outs() << "  \"" << currentState << "\""
-                                 << " -> "
-                                 << "\"" << nextState << "\""
-                                 << " [label=\"" << input << "\"];\n";
-                }
+                llvm::outs() << "  \"" << currentState << "\""
+                             << " -> "
+                             << "\"" << nextState << "\""
+                             << " [label=\"" << input << "\"];\n";
             }
         }
 
-        // 4. End the graph
         llvm::outs() << "}\n";
 
         return PreservedAnalyses::all();

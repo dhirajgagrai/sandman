@@ -15,7 +15,9 @@ int main(int argc, const char **argv) {
     if (num) {
         x = rand();
     } else {
+        printf("Enter test\n");
         test();
+        printf("Exit test\n");
     }
 
     printf("%i\n", x);
