@@ -50,6 +50,17 @@ struct CfgPass : public PassInfoMixin<CfgPass> {
     PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM) {
         LibFunc LF;
 
+        // 1. Start the graph
+        llvm::outs() << "digraph NFA {\n";
+        llvm::outs() << "  node [shape=doublebox];\n\n";
+
+        // 2. Define special nodes (accepting states)
+        const std::set<std::string> &specialStates = {"main-entry", "test-entry", "main-exit", "test-exit"};
+        for (const std::string &state : specialStates) {
+            llvm::outs() << "  \"" << state << "\" [shape=circle,width=1,fixedsize=true];\n";
+        }
+        llvm::outs() << "\n";
+
         for (Module::iterator FI = M.begin(), FE = M.end(); FI != FE; ++FI) {
             map<string, map<string, string>> nfa;
             if (!isLibFn(FI->getName().str())) {
@@ -102,25 +113,28 @@ struct CfgPass : public PassInfoMixin<CfgPass> {
                 } // end Function:iterator loop
             }
 
+            // Loop through the OUTER map (Key = currentState)
             for (const auto &outerPair : nfa) {
-                string currentState = outerPair.first;
+                std::string currentState = outerPair.first;
                 const auto &transitions = outerPair.second;
 
-                errs() << "\nState: " << currentState << "\n";
-
-                if (transitions.empty()) {
-                    errs() << "  (No outgoing transitions)" << "\n";
-                    continue;
-                }
-
+                // Loop through the INNER map
                 for (const auto &innerPair : transitions) {
-                    string nextState = innerPair.first;
-                    string input = innerPair.second;
+                    // Your logic:
+                    std::string nextState = innerPair.first; // Key = Next State
+                    std::string input = innerPair.second;    // Value = Input
 
-                    errs() << "  On Input: " << input << " -> Go To: " << nextState << "\n";
+                    // Create the DOT edge from this logic
+                    llvm::outs() << "  \"" << currentState << "\""
+                                 << " -> "
+                                 << "\"" << nextState << "\""
+                                 << " [label=\"" << input << "\"];\n";
                 }
             }
         }
+
+        // 4. End the graph
+        llvm::outs() << "}\n";
 
         return PreservedAnalyses::all();
     };
