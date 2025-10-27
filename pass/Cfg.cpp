@@ -62,70 +62,85 @@ struct CfgPass : public PassInfoMixin<CfgPass> {
 
         map<string, map<string, string>> nfa;
 
-        for (Module::iterator FI = M.begin(), FE = M.end(); FI != FE; ++FI) {
-            if (!isLibFn(FI->getName().str())) {
-                Function &F = *FI;
-                BasicBlock &EntryBlock = F.getEntryBlock();
-
-                for (Function::iterator BI = F.begin(), BE = F.end(); BI != BE; ++BI) {
-                    BasicBlock *B = dyn_cast<BasicBlock>(&*BI);
-                    string bbName = FI->getName().str() + "-" + B->getName().str();
-
-                    if (B->getName().str() == EntryBlock.getName().str()) {
-                        bbName = FI->getName().str() + "-" + ENTRY;
-                    }
-
-                    bool isItrmInserted = false;
-                    int itrmCount = 1;
-                    string uBbName = "";
-                    string prevBb = bbName;
-
-                    for (Instruction &I : *B) {
-                        if (isa<CallInst>(I)) {
-                            string funcName = cast<CallInst>(I).getCalledFunction()->getName().str();
-                            if (isLibFn(funcName)) {
-                                uBbName = bbName + "_i" + to_string(itrmCount);
-                                nfa[prevBb][uBbName] = funcName + "()";
-
-                                itrmCount++;
-                            } else {
-                                uBbName = funcName + "-" + ENTRY;
-                                nfa[prevBb][uBbName] = EP;
-                                uBbName = funcName + "-" + EXIT;
-                            }
-
-                            prevBb = uBbName;
-                            isItrmInserted = true;
-                        }
-                    }
-
-                    if (successors(B).empty()) {
-                        string uExit = FI->getName().str() + "-" + EXIT;
-                        if (isItrmInserted) {
-                            // epsilon transition to exit state after intermediate lib call in a block
-                            // uBbName -> last intermediate lib call
-                            nfa[uBbName][uExit] = EP;
-                        } else {
-                            // epsilon transition to exit state from a block
-                            nfa[bbName][uExit] = EP;
-                        }
-                    } else {
-                        for (BasicBlock *Succ : successors(B)) {
-                            string uSuccName = FI->getName().str() + "-" + Succ->getName().str();
-                            if (isItrmInserted) {
-                                // epsilon transition to successor blocks after intermediate lib call in a block
-                                // uBbName -> last intermediate lib call
-                                nfa[uBbName][uSuccName] = EP;
-                            } else {
-                                // epsilon transition to successor blocks from a block
-                                nfa[bbName][uSuccName] = EP;
-                            }
-                        }
-                    }
-
-                } // end Function:iterator loop
+        for (Function &F : M) {
+            if (F.isDeclaration()) {
+                continue;
             }
-        } // end Module:iterator loop
+
+            BasicBlock &EntryBlock = F.getEntryBlock();
+
+            for (Function::iterator BI = F.begin(), BE = F.end(); BI != BE; ++BI) {
+                BasicBlock *B = dyn_cast<BasicBlock>(&*BI);
+                string bbName = F.getName().str() + "-" + B->getName().str();
+
+                if (B->getName().str() == EntryBlock.getName().str()) {
+                    bbName = F.getName().str() + "-" + ENTRY;
+                }
+
+                bool isItrmInserted = false;
+                int itrmCount = 1;
+                string uBbName = "";
+                string prevBb = bbName;
+
+                for (Instruction &I : *B) {
+                    if (isa<CallInst>(I)) {
+                        Function *CalledF = cast<CallInst>(I).getCalledFunction();
+                        string funcName = "";
+
+                        if (CalledF->isIntrinsic()) {
+                            Intrinsic::ID id = CalledF->getIntrinsicID();
+                            StringRef baseName = Intrinsic::getBaseName(id);
+                            if (baseName.starts_with("llvm.")) {
+                                funcName = baseName.drop_front(5).str();
+                            } else {
+                                funcName = baseName.str();
+                            }
+                        } else {
+                            funcName = CalledF->getName().str();
+                        }
+
+                        if (isLibFn(funcName)) {
+                            uBbName = bbName + "_i" + to_string(itrmCount);
+                            nfa[prevBb][uBbName] = funcName + "()";
+
+                            itrmCount++;
+                        } else {
+                            uBbName = funcName + "-" + ENTRY;
+                            nfa[prevBb][uBbName] = EP;
+                            uBbName = funcName + "-" + EXIT;
+                        }
+
+                        prevBb = uBbName;
+                        isItrmInserted = true;
+                    }
+                }
+
+                if (successors(B).empty()) {
+                    string uExit = F.getName().str() + "-" + EXIT;
+                    if (isItrmInserted) {
+                        // epsilon transition to exit state after intermediate lib call in a block
+                        // uBbName -> last intermediate lib call
+                        nfa[uBbName][uExit] = EP;
+                    } else {
+                        // epsilon transition to exit state from a block
+                        nfa[bbName][uExit] = EP;
+                    }
+                } else {
+                    for (BasicBlock *Succ : successors(B)) {
+                        string uSuccName = F.getName().str() + "-" + Succ->getName().str();
+                        if (isItrmInserted) {
+                            // epsilon transition to successor blocks after intermediate lib call in a block
+                            // uBbName -> last intermediate lib call
+                            nfa[uBbName][uSuccName] = EP;
+                        } else {
+                            // epsilon transition to successor blocks from a block
+                            nfa[bbName][uSuccName] = EP;
+                        }
+                    }
+                }
+
+            } // end Function:iterator loop
+        }
 
         for (const auto &outerPair : nfa) {
             std::string currentState = outerPair.first;
