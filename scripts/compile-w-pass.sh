@@ -5,7 +5,7 @@ set -e
 
 # --- Configuration ---
 # Path to your compiled pass plugin
-PASS_PLUGIN="./build/pass/Cfg.so"
+PASS_PLUGIN="./build/pass/SandmanPlugin.so"
 # ---------------------
 
 # 1. Check if an argument was provided
