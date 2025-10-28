@@ -95,6 +95,10 @@ struct CfgPass : public PassInfoMixin<CfgPass> {
                             } else {
                                 funcName = baseName.str();
                             }
+
+                            if (!isLibFn(funcName)) {
+                                continue;
+                            }
                         } else {
                             funcName = CalledF->getName().str();
                         }
@@ -105,9 +109,11 @@ struct CfgPass : public PassInfoMixin<CfgPass> {
 
                             itrmCount++;
                         } else {
-                            uBbName = funcName + "-" + ENTRY;
-                            nfa[prevBb][uBbName] = EP;
-                            uBbName = funcName + "-" + EXIT;
+                            string funcEntry = funcName + "-" + ENTRY;
+                            nfa[prevBb][funcEntry] = EP;
+                            string funcExit = funcName + "-" + EXIT;
+                            nfa[funcEntry][funcExit] = EP;
+                            uBbName = funcExit;
                         }
 
                         prevBb = uBbName;
