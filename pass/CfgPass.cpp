@@ -4,13 +4,195 @@
 
 #include <fstream>
 #include <map>
+#include <queue>
 #include <random>
+#include <sstream>
 #include <unordered_set>
 
 using namespace llvm;
 using namespace std;
 
 AnalysisKey CfgPass::Key;
+
+const string EP = "EP";
+const string ENTRY = "entry";
+const string EXIT = "exit";
+
+using StateSet = set<string>;
+using NfaTransitions = map<string, map<string, StateSet>>;
+
+struct DfaStateInfo {
+    StateSet nfaStates;
+    bool isAcceptState = false;
+};
+
+using DfaTransitions = map<string, map<string, string>>;
+using DfaStatesMap = map<string, DfaStateInfo>;
+
+StateSet epsilonClosure(const StateSet &states, const NfaTransitions &nfa) {
+    StateSet closure = states;
+    queue<string> worklist;
+    for (const auto &state : states) {
+        worklist.push(state);
+    }
+
+    while (!worklist.empty()) {
+        string currentState = worklist.front();
+        worklist.pop();
+
+        auto nfaStateIt = nfa.find(currentState);
+        if (nfaStateIt != nfa.end()) {
+            const auto &transitions = nfaStateIt->second;
+            auto epsilonIt = transitions.find(EP);
+            if (epsilonIt != transitions.end()) {
+                for (const auto &nextState : epsilonIt->second) {
+                    if (closure.insert(nextState).second) {
+                        worklist.push(nextState);
+                    }
+                }
+            }
+        }
+    }
+    return closure;
+}
+
+StateSet move(const StateSet &states, const string &input, const NfaTransitions &nfa) {
+    StateSet reachableStates;
+    for (const auto &state : states) {
+        auto nfaStateIt = nfa.find(state);
+        if (nfaStateIt != nfa.end()) {
+            const auto &transitions = nfaStateIt->second;
+            auto inputIt = transitions.find(input);
+            if (inputIt != transitions.end()) {
+                reachableStates.insert(inputIt->second.begin(), inputIt->second.end());
+            }
+        }
+    }
+    return reachableStates;
+}
+
+string stateSetToString(const StateSet &states) {
+    stringstream ss;
+    vector<string> sortedStates(states.begin(), states.end());
+    std::sort(sortedStates.begin(), sortedStates.end());
+    ss << "{";
+    bool first = true;
+    for (const auto &state : sortedStates) {
+        if (!first)
+            ss << ",";
+        ss << state;
+        first = false;
+    }
+    ss << "}";
+    return ss.str();
+}
+
+struct DfaResult {
+    DfaTransitions transitions;
+    DfaStatesMap states;
+    string startStateName;
+    set<string> acceptStateNames;
+};
+
+DfaResult convertNfaToDfa(
+    const NfaTransitions &nfa,
+    const string &nfaStartState,
+    const StateSet &nfaAcceptStates) {
+    DfaResult dfaResult;
+    map<StateSet, string> stateSetToDfaName;
+    queue<StateSet> worklist;
+    set<string> alphabet;
+    int dfaStateCounter = 0;
+
+    for (const auto &pair : nfa) {
+        for (const auto &transPair : pair.second) {
+            if (transPair.first != EP) {
+                alphabet.insert(transPair.first);
+            }
+        }
+    }
+
+    StateSet startSet = epsilonClosure({nfaStartState}, nfa);
+    if (stateSetToDfaName.find(startSet) == stateSetToDfaName.end()) {
+        dfaResult.startStateName = "D" + to_string(dfaStateCounter++);
+        stateSetToDfaName[startSet] = dfaResult.startStateName;
+        dfaResult.states[dfaResult.startStateName] = {startSet, false};
+        worklist.push(startSet);
+    } else {
+        dfaResult.startStateName = stateSetToDfaName[startSet];
+    }
+
+    while (!worklist.empty()) {
+        StateSet currentNfaStates = worklist.front();
+        worklist.pop();
+        string currentDfaName = stateSetToDfaName[currentNfaStates];
+
+        for (const string &input : alphabet) {
+            StateSet nextNfaStatesRaw = move(currentNfaStates, input, nfa);
+            if (nextNfaStatesRaw.empty()) {
+                continue;
+            }
+            StateSet nextNfaStatesClosure = epsilonClosure(nextNfaStatesRaw, nfa);
+
+            string nextDfaName;
+            if (stateSetToDfaName.find(nextNfaStatesClosure) == stateSetToDfaName.end()) {
+                nextDfaName = "D" + to_string(dfaStateCounter++);
+                stateSetToDfaName[nextNfaStatesClosure] = nextDfaName;
+                dfaResult.states[nextDfaName] = {nextNfaStatesClosure, false};
+                worklist.push(nextNfaStatesClosure);
+            } else {
+                nextDfaName = stateSetToDfaName[nextNfaStatesClosure];
+            }
+            dfaResult.transitions[currentDfaName][input] = nextDfaName;
+        }
+    }
+
+    for (auto &pair : dfaResult.states) {
+        const string &dfaName = pair.first;
+        DfaStateInfo &dfaInfo = pair.second;
+        for (const string &nfaAcceptState : nfaAcceptStates) {
+            if (dfaInfo.nfaStates.count(nfaAcceptState)) {
+                dfaInfo.isAcceptState = true;
+                dfaResult.acceptStateNames.insert(dfaName);
+                break;
+            }
+        }
+    }
+
+    return dfaResult;
+}
+
+void printDfaDot(const DfaResult &dfa) {
+    outs() << "digraph DFA {\n";
+    outs() << "  node [shape = point]; start_node;\n";
+    outs() << "  node [shape = circle];\n";
+
+    for (const auto &pair : dfa.states) {
+        const string &dfaName = pair.first;
+        const DfaStateInfo &dfaInfo = pair.second;
+        outs() << "  \"" << dfaName << "\" [label=\"" << dfaName
+               << "\""
+               << (dfaInfo.isAcceptState ? ", shape=doublecircle" : "")
+               << "];\n";
+    }
+
+    outs() << "  start_node -> \"" << dfa.startStateName << "\";\n";
+
+    for (const auto &outerPair : dfa.transitions) {
+        const string &currentState = outerPair.first;
+        const auto &transitions = outerPair.second;
+        for (const auto &innerPair : transitions) {
+            const string &input = innerPair.first;
+            const string &nextState = innerPair.second;
+            outs() << "  \"" << currentState << "\""
+                   << " -> "
+                   << "\"" << nextState << "\""
+                   << " [label=\"" << input << "\"];\n";
+        }
+    }
+
+    outs() << "}\n";
+}
 
 unordered_set<string> loadFunctionList() {
     unordered_set<string> fns;
@@ -41,25 +223,10 @@ bool CfgPass::isLibFn(const string &nameToFind) const {
     return FnsList.count(nameToFind) > 0;
 }
 
-const string EP = "EP";
-const string ENTRY = "entry";
-const string EXIT = "exit";
-
-unordered_set<string> fnsList;
-
-CfgPass::Result CfgPass::run(Module &M, ModuleAnalysisManager &AM) {
+CfgPassResult CfgPass::run(Module &M, ModuleAnalysisManager &AM) {
     Result R;
 
-    outs() << "digraph NFA {\n";
-    outs() << "  node [shape=doublebox];\n\n";
-
-    const set<string> &specialStates = {"main-" + ENTRY, "main-" + EXIT};
-    for (const string &state : specialStates) {
-        outs() << "  \"" << state << "\" [shape=circle,width=1,fixedsize=true];\n";
-    }
-    outs() << "\n";
-
-    map<string, map<string, set<string>>> nfa;
+    NfaTransitions nfa;
 
     random_device rd;
     mt19937 gen(rd());
@@ -159,24 +326,8 @@ CfgPass::Result CfgPass::run(Module &M, ModuleAnalysisManager &AM) {
         } // end Function:iterator loop
     }
 
-    for (const auto &outerPair : nfa) {
-        std::string currentState = outerPair.first;
-        const auto &transitions = outerPair.second;
-
-        for (const auto &innerPair : transitions) {
-            std::string input = innerPair.first;
-            const auto &nextStates = innerPair.second;
-
-            for (const std::string &nextState : nextStates) {
-                llvm::outs() << "  \"" << currentState << "\""
-                             << " -> "
-                             << "\"" << nextState << "\""
-                             << " [label=\"" << input << "\"];\n";
-            }
-        }
-    }
-
-    outs() << "}\n";
+    DfaResult dfa = convertNfaToDfa(nfa, "main-" + ENTRY, {"main-" + EXIT});
+    printDfaDot(dfa);
 
     return R;
 };
