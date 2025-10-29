@@ -9,7 +9,7 @@ using namespace llvm;
 extern "C" LLVM_ATTRIBUTE_WEAK ::PassPluginLibraryInfo
 llvmGetPassPluginInfo() {
     return {.APIVersion = LLVM_PLUGIN_API_VERSION,
-            .PluginName = "MyPlugin",
+            .PluginName = "SandmanPlugin",
             .PluginVersion = "v0.1",
             .RegisterPassBuilderCallbacks = [](PassBuilder &PB) {
                 PB.registerAnalysisRegistrationCallback(

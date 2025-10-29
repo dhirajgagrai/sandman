@@ -10,7 +10,7 @@
 using namespace llvm;
 using namespace std;
 
-llvm::AnalysisKey CfgPass::Key;
+AnalysisKey CfgPass::Key;
 
 unordered_set<string> loadFunctionList() {
     unordered_set<string> fns;
@@ -26,7 +26,7 @@ unordered_set<string> loadFunctionList() {
         }
         dumpFile.close();
     } else {
-        llvm::errs() << "ERROR: Could not open dump file.\n";
+        errs() << "ERROR: Could not open dump file.\n";
         exit(1);
     }
 
@@ -50,20 +50,20 @@ unordered_set<string> fnsList;
 CfgPass::Result CfgPass::run(Module &M, ModuleAnalysisManager &AM) {
     Result R;
 
-    llvm::outs() << "digraph NFA {\n";
-    llvm::outs() << "  node [shape=doublebox];\n\n";
+    outs() << "digraph NFA {\n";
+    outs() << "  node [shape=doublebox];\n\n";
 
-    const std::set<std::string> &specialStates = {"main-" + ENTRY, "main-" + EXIT};
-    for (const std::string &state : specialStates) {
-        llvm::outs() << "  \"" << state << "\" [shape=circle,width=1,fixedsize=true];\n";
+    const set<string> &specialStates = {"main-" + ENTRY, "main-" + EXIT};
+    for (const string &state : specialStates) {
+        outs() << "  \"" << state << "\" [shape=circle,width=1,fixedsize=true];\n";
     }
-    llvm::outs() << "\n";
+    outs() << "\n";
 
-    map<string, map<string, string>> nfa;
+    map<string, map<string, set<string>>> nfa;
 
     random_device rd;
     mt19937 gen(rd());
-    std::uniform_int_distribution<int> distrib(100, 999);
+    uniform_int_distribution<int> distrib(100, 999);
 
     int uid = distrib(gen);
 
@@ -109,19 +109,22 @@ CfgPass::Result CfgPass::run(Module &M, ModuleAnalysisManager &AM) {
                     }
 
                     if (isLibFn(funcName)) {
+                        string transition = funcName + "(): " + to_string(uid);
                         uBbName = bbName + "_i" + to_string(itrmCount);
-                        nfa[prevBb][uBbName] = funcName + "(): " + to_string(uid);
+                        nfa[prevBb][transition].insert(uBbName);
 
-                        R.FoundLibCalls[llvm::dyn_cast<llvm::CallInst>(&I)] = uid;
+                        R.FoundLibCalls[dyn_cast<CallInst>(&I)] = uid;
 
                         uid++;
                         itrmCount++;
                     } else {
                         string funcEntry = funcName + "-" + ENTRY;
-                        nfa[prevBb][funcEntry] = EP;
+                        nfa[prevBb][EP].insert(funcEntry);
                         string funcExit = funcName + "-" + EXIT;
-                        nfa[funcEntry][funcExit] = EP;
                         uBbName = funcExit;
+                        if (CalledF->isIntrinsic()) {
+                            nfa[prevBb][EP].insert(funcExit);
+                        }
                     }
 
                     prevBb = uBbName;
@@ -134,10 +137,10 @@ CfgPass::Result CfgPass::run(Module &M, ModuleAnalysisManager &AM) {
                 if (isItrmInserted) {
                     // epsilon transition to exit state after intermediate lib call in a block
                     // uBbName -> last intermediate lib call
-                    nfa[uBbName][uExit] = EP;
+                    nfa[uBbName][EP].insert(uExit);
                 } else {
                     // epsilon transition to exit state from a block
-                    nfa[bbName][uExit] = EP;
+                    nfa[bbName][EP].insert(uExit);
                 }
             } else {
                 for (BasicBlock *Succ : successors(B)) {
@@ -145,10 +148,10 @@ CfgPass::Result CfgPass::run(Module &M, ModuleAnalysisManager &AM) {
                     if (isItrmInserted) {
                         // epsilon transition to successor blocks after intermediate lib call in a block
                         // uBbName -> last intermediate lib call
-                        nfa[uBbName][uSuccName] = EP;
+                        nfa[uBbName][EP].insert(uSuccName);
                     } else {
                         // epsilon transition to successor blocks from a block
-                        nfa[bbName][uSuccName] = EP;
+                        nfa[bbName][EP].insert(uSuccName);
                     }
                 }
             }
@@ -161,17 +164,19 @@ CfgPass::Result CfgPass::run(Module &M, ModuleAnalysisManager &AM) {
         const auto &transitions = outerPair.second;
 
         for (const auto &innerPair : transitions) {
-            std::string nextState = innerPair.first;
-            std::string input = innerPair.second;
+            std::string input = innerPair.first;
+            const auto &nextStates = innerPair.second;
 
-            llvm::outs() << "  \"" << currentState << "\""
-                         << " -> "
-                         << "\"" << nextState << "\""
-                         << " [label=\"" << input << "\"];\n";
+            for (const std::string &nextState : nextStates) {
+                llvm::outs() << "  \"" << currentState << "\""
+                             << " -> "
+                             << "\"" << nextState << "\""
+                             << " [label=\"" << input << "\"];\n";
+            }
         }
     }
 
-    llvm::outs() << "}\n";
+    outs() << "}\n";
 
     return R;
 };
