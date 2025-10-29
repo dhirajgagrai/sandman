@@ -3,13 +3,12 @@
 
 #include "llvm/IR/Module.h"
 #include "llvm/IR/PassManager.h"
-#include <set>
-#include <string>
+#include <map>
 #include <unordered_set>
 
 class CfgPassResult {
   public:
-    std::set<llvm::CallInst *> FoundLibCalls;
+    std::map<llvm::CallInst *, int> FoundLibCalls;
 };
 
 struct CfgPass : public llvm::AnalysisInfoMixin<CfgPass> {

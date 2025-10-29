@@ -2,54 +2,36 @@
 #include "CfgPass.h"
 
 #include "llvm/IR/IRBuilder.h"
-#include "llvm/IR/Instructions.h"
-#include "llvm/IR/LLVMContext.h"
-#include "llvm/IR/Type.h"
 
 using namespace llvm;
 using namespace std;
 
+const int64_t DUMMY_ID = 69420;
+
 PreservedAnalyses DummyPass::run(Module &M, ModuleAnalysisManager &AM) {
     const CfgPassResult &Result = AM.getResult<CfgPass>(M);
 
-    if (!Result.FoundLibCalls.empty()) {
-        LLVMContext &Ctx = M.getContext();
+    if (Result.FoundLibCalls.empty()) {
+        return PreservedAnalyses::all();
+    }
 
-        Type *Int32Ty = Type::getInt32Ty(Ctx);
-        Type *Int8PtrTy = PointerType::getUnqual(Ctx);
-        FunctionType *PrintfType = FunctionType::get(
-            Int32Ty,   // Return type
-            Int8PtrTy, // First arg: char*
-            true       // isVarArg
-        );
+    LLVMContext &Ctx = M.getContext();
 
-        FunctionCallee PrintfFunc = M.getOrInsertFunction("printf", PrintfType);
-        IRBuilder<> Builder(Ctx);
+    Type *Int64Ty = Type::getInt64Ty(Ctx);
+    Type *Int32Ty = Type::getInt32Ty(Ctx);
 
-        GlobalVariable *GlobalStr = Builder.CreateGlobalString(
-            "--- instrumented ---\n",
-            ".hook_fmt_str",
-            0, // Address Space
-            &M // Module to add it to
-        );
+    FunctionType *SyscallFuncType = FunctionType::get(Int64Ty, {Int64Ty}, true);
 
-        Value *FormatString = Builder.CreateConstInBoundsGEP2_32(
-            GlobalStr->getValueType(),
-            GlobalStr,
-            0, 0, // GEP indices (for array, then element)
-            ".hook_fmt_str_ptr");
+    FunctionCallee SyscallFunc = M.getOrInsertFunction("syscall", SyscallFuncType);
 
-        for (llvm::CallInst *CI : Result.FoundLibCalls) {
-            Builder.SetInsertPoint(CI);
+    IRBuilder<> Builder(Ctx);
 
-            // --- 4. Insert the call to printf ---
-            // We re-use the *same* FormatString constant for every call
-            Builder.CreateCall(PrintfFunc, {FormatString});
-
-            errs() << "  -> Instrumenting: ";
-            CI->print(errs());
-            errs() << "\n";
-        }
+    for (auto const &[CI, id] : Result.FoundLibCalls) {
+        Builder.SetInsertPoint(CI);
+        Value *SyscallNum = ConstantInt::get(Int64Ty, DUMMY_ID);
+        Value *idVal = ConstantInt::get(Int32Ty, id);
+        Value *idVal64 = Builder.CreateZExt(idVal, Int64Ty);
+        Builder.CreateCall(SyscallFunc, {SyscallNum, idVal64});
     }
 
     return PreservedAnalyses::none();

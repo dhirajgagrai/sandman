@@ -4,6 +4,7 @@
 
 #include <fstream>
 #include <map>
+#include <random>
 #include <unordered_set>
 
 using namespace llvm;
@@ -60,6 +61,12 @@ CfgPass::Result CfgPass::run(Module &M, ModuleAnalysisManager &AM) {
 
     map<string, map<string, string>> nfa;
 
+    random_device rd;
+    mt19937 gen(rd());
+    std::uniform_int_distribution<int> distrib(100, 999);
+
+    int uid = distrib(gen);
+
     for (Function &F : M) {
         if (F.isDeclaration()) {
             continue;
@@ -103,10 +110,11 @@ CfgPass::Result CfgPass::run(Module &M, ModuleAnalysisManager &AM) {
 
                     if (isLibFn(funcName)) {
                         uBbName = bbName + "_i" + to_string(itrmCount);
-                        nfa[prevBb][uBbName] = funcName + "()";
+                        nfa[prevBb][uBbName] = funcName + "(): " + to_string(uid);
 
-                        R.FoundLibCalls.insert(llvm::dyn_cast<llvm::CallInst>(&I));
+                        R.FoundLibCalls[llvm::dyn_cast<llvm::CallInst>(&I)] = uid;
 
+                        uid++;
                         itrmCount++;
                     } else {
                         string funcEntry = funcName + "-" + ENTRY;
