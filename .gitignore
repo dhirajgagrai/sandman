@@ -1,0 +1,11 @@
+.cache
+build
+
+.DS_Store
+
+*.out
+./test/*.out
+*.dat
+*.dot
+
+pass/resources/libc_functions.txt
