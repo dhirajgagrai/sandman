@@ -163,7 +163,7 @@ MinNfaResult convertNfaToMinNfa(
 }
 
 void printNfaDot(const MinNfaResult &nfa) {
-    std::error_code EC;
+    error_code EC;
     raw_fd_ostream DotFile("nfa.dot", EC);
 
     if (EC) {
@@ -201,10 +201,10 @@ void printNfaDot(const MinNfaResult &nfa) {
     }
 }
 
-void generateDatFiles(const MinNfaResult &nfa, const std::map<std::string, int> &inputSymbolToId) {
+void generateDatFiles(const MinNfaResult &nfa, const map<std::string, int> &inputSymbolToId) {
     const int FINAL_STATE = 69420;
 
-    std::error_code EC;
+    error_code EC;
     raw_fd_ostream DatFile("nfa.dat", EC);
 
     if (EC) {
@@ -212,7 +212,7 @@ void generateDatFiles(const MinNfaResult &nfa, const std::map<std::string, int> 
     } else {
         int count = 0;
         int errorStateId = -1;
-        std::map<std::string, int> stateNameToId;
+        map<std::string, int> stateNameToId;
 
         stateNameToId[nfa.startStateName] = count++;
         stateNameToId["STATE_ERROR"] = errorStateId;
@@ -222,19 +222,19 @@ void generateDatFiles(const MinNfaResult &nfa, const std::map<std::string, int> 
                 count++;
             }
 
-            const std::string &stateName = statePair.first;
+            const string &stateName = statePair.first;
             if (stateNameToId.find(stateName) == stateNameToId.end()) {
                 stateNameToId[stateName] = count++;
             }
         }
 
         for (const auto &outerPair : nfa.transitions) {
-            std::string currentStateName = outerPair.first;
+            string currentStateName = outerPair.first;
             for (const auto &innerPair : outerPair.second) {
-                std::string inputSymbol = innerPair.first;
-                std::string nextStateName = innerPair.second;
+                string inputSymbol = innerPair.first;
+                string nextStateName = innerPair.second;
 
-                int is_final = nfa.acceptStateNames.count(nextStateName);
+                int isFinal = nfa.acceptStateNames.count(nextStateName);
 
                 if (inputSymbolToId.count(inputSymbol) &&
                     stateNameToId.count(currentStateName) &&
@@ -243,7 +243,7 @@ void generateDatFiles(const MinNfaResult &nfa, const std::map<std::string, int> 
                     int inputId = inputSymbolToId.at(inputSymbol);
                     int nextStateId = stateNameToId.at(nextStateName);
 
-                    DatFile << currentStateId << " " << inputId << " " << nextStateId << " " << is_final << "\n";
+                    DatFile << currentStateId << " " << inputId << " " << nextStateId << " " << isFinal << "\n";
                 }
             }
         }
@@ -285,8 +285,8 @@ CfgPassResult CfgPass::run(Module &M, ModuleAnalysisManager &AM) {
     Result R;
 
     NfaTransitions nfa;
-    std::map<std::string, int> funcId;
-    std::set<std::string> nfaAcceptStates;
+    map<std::string, int> funcId;
+    set<std::string> nfaAcceptStates;
 
     nfaAcceptStates.insert("main-" + EXIT);
 
@@ -400,7 +400,7 @@ CfgPassResult CfgPass::run(Module &M, ModuleAnalysisManager &AM) {
     }
 
     // Post processing to remove transition from accepting states
-    for (const std::string &acceptState : nfaAcceptStates) {
+    for (const string &acceptState : nfaAcceptStates) {
         if (nfa.count(acceptState)) {
             nfa.erase(acceptState);
         }

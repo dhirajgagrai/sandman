@@ -42,4 +42,3 @@ llvm-link "${bitcode_files[@]}" -o combined.bc
 clang -fpass-plugin=./build/pass/SandmanPlugin.so combined.bc -o "$OUTPUT_FILE"
 
 rm "${bitcode_files[@]}" combined.bc
-

@@ -35,4 +35,3 @@ OUTPUT_FILE="${SOURCE_FILE%.c}.out"
 
 # 6. Run the compile command with the variables
 clang -fpass-plugin="$PASS_PLUGIN" "$SOURCE_FILE" -o "$OUTPUT_FILE"
-
