@@ -9,3 +9,5 @@ build
 *.dot
 
 pass/resources/libc_functions.txt
+
+ebpf-loader
