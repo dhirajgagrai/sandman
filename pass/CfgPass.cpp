@@ -202,23 +202,29 @@ void printNfaDot(const MinNfaResult &nfa) {
 }
 
 void generateDatFiles(const MinNfaResult &nfa, const std::map<std::string, int> &inputSymbolToId) {
+    const int FINAL_STATE = 69420;
+
     std::error_code EC;
     raw_fd_ostream DatFile("nfa.dat", EC);
 
     if (EC) {
         errs() << "Error opening nfa.dat: " << EC.message() << "\n";
     } else {
-        int stateIdCounter = 0;
+        int count = 0;
         int errorStateId = -1;
         std::map<std::string, int> stateNameToId;
 
-        stateNameToId[nfa.startStateName] = stateIdCounter++;
+        stateNameToId[nfa.startStateName] = count++;
         stateNameToId["STATE_ERROR"] = errorStateId;
 
         for (const auto &statePair : nfa.states) {
+            if (count == FINAL_STATE) {
+                count++;
+            }
+
             const std::string &stateName = statePair.first;
             if (stateNameToId.find(stateName) == stateNameToId.end()) {
-                stateNameToId[stateName] = stateIdCounter++;
+                stateNameToId[stateName] = count++;
             }
         }
 

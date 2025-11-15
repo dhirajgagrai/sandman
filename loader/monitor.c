@@ -25,7 +25,7 @@ struct nfa_value {
 
 struct {
     __uint(type, BPF_MAP_TYPE_HASH);
-    __uint(max_entries, 1024);
+    __uint(max_entries, 10240);
     __type(key, struct nfa_key);
     __type(value, struct nfa_value);
 } nfa_transition_map SEC(".maps");
