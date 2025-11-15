@@ -5,7 +5,7 @@ set -e
 
 PASS_PLUGIN="./build/pass/SandmanPlugin.so"
 
-OUTPUT_FILE="build.out"
+OUTPUT_FILE="final-build.out"
 
 if [ $# -eq 0 ]; then
     echo "Error: No C files specified."
