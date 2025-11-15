@@ -23,13 +23,13 @@ static void int_handler(int sig) {
     stop = true;
 }
 
-int load_nfa_rules(struct nfa_monitor *skel) {
+int load_nfa_rules(struct nfa_monitor *skel, const char *dat_file) {
     FILE *f;
     char line[256];
     int line_num = 0;
     int rule_count = 0;
 
-    f = fopen("nfa_table.dat", "r");
+    f = fopen(dat_file, "r");
     if (!f) {
         fprintf(stderr, "ERROR: Failed to open nfa_table.dat: %s\n", strerror(errno));
         return -1;
@@ -61,13 +61,20 @@ int load_nfa_rules(struct nfa_monitor *skel) {
     }
 
     fclose(f);
-    printf("Loader: Successfully loaded %d nfa rules into kernel.\n", rule_count);
+    printf("LOADER: Successfully loaded %d nfa rules into kernel.\n", rule_count);
     return 0;
 }
 
 int main(int argc, char **argv) {
     struct nfa_monitor *skel;
     int err;
+
+    if (argc < 2) {
+        fprintf(stderr, "ERROR: Missing argument.\n");
+        fprintf(stderr, "Usage: %s <nfa.dat>\n", argv[0]);
+        return 1;
+    }
+    const char *dat_file = argv[1];
 
     signal(SIGINT, int_handler);
     signal(SIGTERM, int_handler);
@@ -78,7 +85,7 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    err = load_nfa_rules(skel);
+    err = load_nfa_rules(skel, dat_file);
     if (err) {
         fprintf(stderr, "ERROR: Failed to load nfa rules.\n");
         goto cleanup;
