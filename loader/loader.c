@@ -23,7 +23,7 @@ static void int_handler(int sig) {
     stop = true;
 }
 
-int load_nfa_rules(struct nfa_monitor *skel, const char *dat_file) {
+int load_nfa_rules(struct monitor *skel, const char *dat_file) {
     FILE *f;
     char line[256];
     int line_num = 0;
@@ -31,7 +31,7 @@ int load_nfa_rules(struct nfa_monitor *skel, const char *dat_file) {
 
     f = fopen(dat_file, "r");
     if (!f) {
-        fprintf(stderr, "ERROR: Failed to open nfa_table.dat: %s\n", strerror(errno));
+        fprintf(stderr, "ERROR: Failed to open dat file: %s\n", strerror(errno));
         return -1;
     }
 
@@ -66,7 +66,7 @@ int load_nfa_rules(struct nfa_monitor *skel, const char *dat_file) {
 }
 
 int main(int argc, char **argv) {
-    struct nfa_monitor *skel;
+    struct monitor *skel;
     int err;
 
     if (argc < 2) {
@@ -79,7 +79,7 @@ int main(int argc, char **argv) {
     signal(SIGINT, int_handler);
     signal(SIGTERM, int_handler);
 
-    skel = nfa_monitor__open_and_load();
+    skel = monitor__open_and_load();
     if (!skel) {
         fprintf(stderr, "ERROR: Failed to open BPF skeleton\n");
         return 1;
@@ -91,7 +91,7 @@ int main(int argc, char **argv) {
         goto cleanup;
     }
 
-    err = nfa_monitor__attach(skel);
+    err = monitor__attach(skel);
     if (err) {
         fprintf(stderr, "ERROR: Failed to attach BPF skeleton: %s\n", strerror(-err));
         goto cleanup;
@@ -103,7 +103,7 @@ int main(int argc, char **argv) {
     }
 
 cleanup:
-    nfa_monitor__destroy(skel);
+    monitor__destroy(skel);
     printf("\neBPF monitor detached and unloaded.\n");
     return -err;
 }
