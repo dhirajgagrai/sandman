@@ -151,7 +151,7 @@ MinNfaResult convertNfaToMinNfa(
         const string &nfaName = pair.first;
         MinNfaStateInfo &nfaInfo = pair.second;
         for (const string &nfaAcceptState : nfaAcceptStates) {
-            if (nfaInfo.nfaStates.count(nfaAcceptState)) {
+            if (nfaInfo.nfaStates.count(nfaAcceptState) && minNfaResult.transitions.count(nfaName) == 0) {
                 nfaInfo.isAcceptState = true;
                 minNfaResult.acceptStateNames.insert(nfaName);
                 break;
