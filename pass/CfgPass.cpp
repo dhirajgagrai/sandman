@@ -162,7 +162,7 @@ MinNfaResult convertNfaToMinNfa(
     return minNfaResult;
 }
 
-void printNfaDot(const MinNfaResult &nfa) {
+void generateNfaDot(const MinNfaResult &nfa) {
     error_code EC;
     raw_fd_ostream DotFile("nfa.dot", EC);
 
@@ -407,7 +407,7 @@ CfgPassResult CfgPass::run(Module &M, ModuleAnalysisManager &AM) {
     }
 
     MinNfaResult minNfa = convertNfaToMinNfa(nfa, "main-" + ENTRY, nfaAcceptStates);
-    printNfaDot(minNfa);
+    generateNfaDot(minNfa);
     generateDatFiles(minNfa, funcId);
 
     return R;
