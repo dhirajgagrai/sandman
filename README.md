@@ -82,6 +82,7 @@ sudo make -C tools/bpf/bpftool/ install
 
 ### Build LLVM Pass
 
+Navigate into root of the project directory and run the following scripts to build the pass:
 ```sh
 ./scripts/clean.sh
 ./scripts/build.sh
@@ -89,6 +90,7 @@ sudo make -C tools/bpf/bpftool/ install
 
 ### Build eBPF loader
 
+In the root of the project directory, run the below script.
 This will generate a executable called `ebpf-loader`:
 ```sh
 ./scripts/ebpf-build.sh
@@ -98,15 +100,15 @@ This will generate a executable called `ebpf-loader`:
 
 Ensure the setup is done properly as given in [Getting Started](#getting-started).
 
-Navigate into Linux kernel directory and run:
-```sh
-make -j8
-```
-
-If there's an error regarding certificates, run following:
+There might be an error regarding certificates, so run following:
 ```sh
 scripts/config --disable SYSTEM_TRUSTED_KEYS
 scripts/config --disable SYSTEM_REVOCATION_KEYS
+```
+
+Navigate into Linux kernel directory and run:
+```sh
+make -j8
 ```
 
 Build the modules under a temporary directory:
@@ -161,4 +163,20 @@ Copy the `ebpf-loader` , `nfa.dat` and `program.c` to QEMU and run it:
 sudo ./ebpf-loader nfa.dat
 ```
 Monitor will start and when `program.out` is executed it will enforce the NFA according to `nfa.dat`.
+
+## Multiple C Files Compilation
+
+To compile multiple file, use the multi-compile script:
+```sh
+sudo ./scripts/multi-compile.sh <file1.c> <file2.c>
+```
+
+This will generate an executable `final-build.out` under project root directory.
+
+To compile programs in mbedtls repo, first run the `make` and build regularly as given in the mbedtls README.md.
+This will generate the required binaries for mbedtls programs to work.
+Then from the root directory of this project, compile the programs using following format:
+```sh
+clang -fpass-plugin=./build/pass/SandmanPlugin.so -I<path-to-mbedtls-project>/include -L<path-to-mbedtls-project>/library <path-to-mbedtls-project>/programs/<sub-program-directory>/<program>.c -lmbedtls -lmbedx509 -lmbedcrypto -o <program>.out
+```
 
