@@ -353,7 +353,12 @@ CfgPassResult CfgPass::run(Module &M, ModuleAnalysisManager &AM) {
                         // Placeholder for non-lib functions
                         string funcEntry = funcName + "-" + ENTRY;
                         nfa[prevBb][EP].insert(funcEntry);
+
                         string funcExit = funcName + "-" + EXIT;
+                        if (CalledF->isDeclaration()) {
+                            nfa[funcEntry][EP].insert(funcExit);
+                        }
+
                         uBbName = funcExit;
 
                         // Intrinsic functions can be bypassed
