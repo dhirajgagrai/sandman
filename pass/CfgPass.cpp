@@ -15,8 +15,10 @@ using namespace std;
 AnalysisKey CfgPass::Key;
 
 const string EP = "EP";
-const string ENTRY = "entry";
-const string EXIT = "exit";
+const string ENTRY = "<ENTRY>";
+const string EXIT = "<EXIT>";
+const string MENTRY = "main-" + ENTRY;
+const string MEXIT = "main-" + EXIT;
 
 using StateSet = set<string>;
 using NfaTransitions = map<string, map<string, StateSet>>;
@@ -288,7 +290,7 @@ CfgPassResult CfgPass::run(Module &M, ModuleAnalysisManager &AM) {
     map<std::string, int> funcId;
     set<std::string> nfaAcceptStates;
 
-    nfaAcceptStates.insert("main-" + EXIT);
+    nfaAcceptStates.insert(MEXIT);
 
     random_device rd;
     mt19937 gen(rd());
@@ -411,7 +413,7 @@ CfgPassResult CfgPass::run(Module &M, ModuleAnalysisManager &AM) {
         }
     }
 
-    MinNfaResult minNfa = convertNfaToMinNfa(nfa, "main-" + ENTRY, nfaAcceptStates);
+    MinNfaResult minNfa = convertNfaToMinNfa(nfa, MENTRY, nfaAcceptStates);
     generateNfaDot(minNfa);
     generateDatFiles(minNfa, funcId);
 
