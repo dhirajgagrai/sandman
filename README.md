@@ -133,7 +133,7 @@ mv Image vmlinuz-<kernel-version>
 
 Now copy the files to the system:
 ```sh
-sudo cp -r ~/tmp_modules/lib/modules/<kernel-version> /lib/modules/
+sudo mv ~/tmp_modules/lib/modules/<kernel-version> /lib/modules/
 sudo cp ~/vmlinuz-<kernel-version> /boot/
 sudo cp ~/config-<kernel-version> /boot/
 ```
