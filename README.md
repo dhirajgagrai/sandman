@@ -157,13 +157,13 @@ To compile C programs, use the scripts provided:
 ./scripts/compile.sh <program.c>
 ```
 This will generate a file called `nfa.dat` for the `program.c` in the root of the project directory
-and also an exectutable `program.out` in the same directory as `program.c`.
+and also an executable `program.out` in the same directory as `program.c`.
 
-Copy the `ebpf-loader` , `nfa.dat` and `program.c` to QEMU and run it:
+Copy the `ebpf-loader` , `nfa.dat` and `program.out` to QEMU and run it:
 ```sh
 sudo ./ebpf-loader nfa.dat
 ```
-Monitor will start and when `program.out` is executed it will enforce the NFA according to `nfa.dat`.
+Monitor will start and when `program.out` is executed it will enforce the NFA according to the transitions in `nfa.dat`.
 
 ## Multiple C Files Compilation
 
