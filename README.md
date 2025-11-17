@@ -85,6 +85,7 @@ sudo make -C tools/bpf/bpftool/ install
 Navigate into root of the project directory and run the following scripts to build the pass:
 ```sh
 ./scripts/clean.sh
+./scripts/dump-libc.sh
 ./scripts/build.sh
 ```
 
